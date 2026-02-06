@@ -26,6 +26,9 @@ App::plugin('tobimori/logo-soup', [
 			$densityFactor,
 		),
 	],
+	'snippets' => [
+		'logo-soup' => __DIR__ . '/snippets/logo-soup.php',
+	],
 	'hooks' => [
 		'file.update:before' => [LogoSoup::class, 'clearCache'],
 		'file.replace:before' => [LogoSoup::class, 'clearCache'],
