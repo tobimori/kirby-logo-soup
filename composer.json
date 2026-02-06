@@ -1,0 +1,30 @@
+{
+	"name": "tobimori/kirby-logo-soup",
+	"description": "Logo visual harmonization & normalization for Kirby CMS (Port of react-logo-soup)",
+	"type": "kirby-plugin",
+  "version": "1.0.0",
+	"license": "MIT",
+	"homepage": "https://github.com/tobimori/kirby-logo-soup#readme",
+  "authors": [
+    {
+      "name": "Tobias Möritz",
+      "email": "tobias@moeritz.io"
+    }
+  ],
+	"require": {
+		"php": ">=8.3.0",
+		"getkirby/composer-installer": "^1.2",
+		"ext-imagick": "*"
+	},
+	"config": {
+    "optimize-autoloader": true,
+    "allow-plugins": {
+      "getkirby/composer-installer": true
+    }
+  },
+	"autoload": {
+		"psr-4": {
+			"tobimori\\": "classes/"
+		}
+	}
+}
