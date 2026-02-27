@@ -3,6 +3,7 @@
 @include_once __DIR__ . '/vendor/autoload.php';
 
 use Kirby\Cms\App;
+use Kirby\Cms\File;
 use tobimori\LogoSoup;
 
 App::plugin('tobimori/logo-soup', [
@@ -30,6 +31,6 @@ App::plugin('tobimori/logo-soup', [
 		'logo-soup' => __DIR__ . '/snippets/logo-soup.php',
 	],
 	'hooks' => [
-		'file.replace:before' => fn(...$args) => LogoSoup::clearCache(...$args),
+		'file.replace:before' => fn(File $file) => LogoSoup::clearCache($file),
 	],
 ]);
