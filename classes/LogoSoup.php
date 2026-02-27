@@ -18,11 +18,9 @@ class LogoSoup
 		$kirby = App::instance();
 		$id = static::getId($file);
 
-		if ($kirby->option('tobimori.logo-soup.cache.metrics')) {
-			$cache = $kirby->cache('tobimori.logo-soup.metrics');
-			if ($cached = $cache->get($id)) {
-				return $cached;
-			}
+		$cache = $kirby->cache('tobimori.logo-soup');
+		if ($cached = $cache->get($id)) {
+			return $cached;
 		}
 
 		try {
@@ -46,9 +44,7 @@ class LogoSoup
 				'visualCenterY' => $visualCenter['offsetY'] / $contentBox['height'],
 			];
 
-			if ($kirby->option('tobimori.logo-soup.cache.metrics')) {
-				$kirby->cache('tobimori.logo-soup.metrics')->set($id, $metrics);
-			}
+			$kirby->cache('tobimori.logo-soup')->set($id, $metrics);
 
 			return $metrics;
 		} catch (\Exception) {
