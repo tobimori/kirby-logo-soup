@@ -7,7 +7,7 @@ use tobimori\LogoSoup;
 
 App::plugin('tobimori/logo-soup', [
 	'options' => [
-		'cache.metrics' => false,
+		'cache' => true,
 		'sampleMaxSize' => 200,
 		'contrastThreshold' => 10,
 	],
