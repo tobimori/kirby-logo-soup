@@ -30,7 +30,6 @@ App::plugin('tobimori/logo-soup', [
 		'logo-soup' => __DIR__ . '/snippets/logo-soup.php',
 	],
 	'hooks' => [
-		'file.update:before' => [LogoSoup::class, 'clearCache'],
-		'file.replace:before' => [LogoSoup::class, 'clearCache'],
+		'file.replace:before' => fn(...$args) => LogoSoup::clearCache(...$args),
 	],
 ]);
