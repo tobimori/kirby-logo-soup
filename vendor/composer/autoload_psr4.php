@@ -7,4 +7,5 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'tobimori\\' => array($baseDir . '/classes'),
+    'Kirby\\' => array($vendorDir . '/getkirby/composer-installer/src'),
 );

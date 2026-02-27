@@ -11,6 +11,10 @@ class ComposerStaticInit17f85c3919c6fe77fb99be42fc100816
         array (
             'tobimori\\' => 9,
         ),
+        'K' =>
+        array (
+            'Kirby\\' => 6,
+        ),
     );
 
     public static $prefixDirsPsr4 = array (
@@ -18,10 +22,18 @@ class ComposerStaticInit17f85c3919c6fe77fb99be42fc100816
         array (
             0 => __DIR__ . '/../..' . '/classes',
         ),
+        'Kirby\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/getkirby/composer-installer/src',
+        ),
     );
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'Kirby\\ComposerInstaller\\CmsInstaller' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/CmsInstaller.php',
+        'Kirby\\ComposerInstaller\\Installer' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/Installer.php',
+        'Kirby\\ComposerInstaller\\Plugin' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/Plugin.php',
+        'Kirby\\ComposerInstaller\\PluginInstaller' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/PluginInstaller.php',
         'tobimori\\LogoSoup' => __DIR__ . '/../..' . '/classes/LogoSoup.php',
     );
 
