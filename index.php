@@ -9,7 +9,7 @@ use tobimori\LogoSoup;
 App::plugin('tobimori/logo-soup', [
 	'options' => [
 		'cache' => true,
-		'sampleMaxSize' => 200,
+		'samplePixelBudget' => 2048,
 		'contrastThreshold' => 10,
 	],
 	'fileMethods' => [
