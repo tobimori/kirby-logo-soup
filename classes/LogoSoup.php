@@ -6,10 +6,15 @@ use Imagick;
 use ImagickPixel;
 use Kirby\Cms\App;
 use Kirby\Cms\File;
+use Kirby\Cms\FileVersion;
+use Kirby\Filesystem\Asset;
+use Kirby\Filesystem\F;
+use Kirby\Filesystem\Filename;
+use Throwable;
 
 class LogoSoup
 {
-	private const CACHE_VERSION = 2;
+	private const CACHE_VERSION = 3;
 
 	public static function analyze(File $file): ?array
 	{
@@ -23,12 +28,25 @@ class LogoSoup
 		}
 
 		try {
-			[$pixels, $width, $height] = static::extractPixels($file, $pixelBudget);
-			$metrics = static::measurePixels($pixels, $width, $height, $threshold);
+			[
+				$pixels,
+				$sampleWidth,
+				$sampleHeight,
+				$sourceWidth,
+				$sourceHeight,
+			] = static::extractPixels($file, $pixelBudget);
+			$metrics = static::measurePixels(
+				$pixels,
+				$sampleWidth,
+				$sampleHeight,
+				$sourceWidth,
+				$sourceHeight,
+				$threshold,
+			);
 			$cache->set($id, $metrics);
 
 			return $metrics;
-		} catch (\Exception) {
+		} catch (Throwable) {
 			return null;
 		}
 	}
@@ -73,6 +91,74 @@ class LogoSoup
 		];
 	}
 
+	public static function cropRaster(File $file, array $metrics): FileVersion|File|Asset
+	{
+		if (
+			strtolower($file->extension()) === 'svg' ||
+			isset($metrics['contentBox']) === false
+		) {
+			return $file;
+		}
+
+		$box = $metrics['contentBox'];
+		$x = max(0, (int) ($box['x'] ?? 0));
+		$y = max(0, (int) ($box['y'] ?? 0));
+		$width = max(1, (int) ($box['width'] ?? 0));
+		$height = max(1, (int) ($box['height'] ?? 0));
+		$sourceWidth = max(1, (int) ($metrics['width'] ?? $file->width()));
+		$sourceHeight = max(1, (int) ($metrics['height'] ?? $file->height()));
+		$width = min($width, $sourceWidth - $x);
+		$height = min($height, $sourceHeight - $y);
+
+		if ($x === 0 && $y === 0 && $width === $sourceWidth && $height === $sourceHeight) {
+			return $file;
+		}
+
+		return $file->thumb([
+			'width' => $width,
+			'height' => $height,
+			'crop' => implode('-', ['logo-soup', $x, $y, $width, $height]),
+			'format' => match (strtolower($file->extension())) {
+				'jpeg' => 'jpg',
+				default => strtolower($file->extension()),
+			},
+			'logoSoupCrop' => compact('x', 'y', 'width', 'height'),
+		]);
+	}
+
+	public static function createThumb(
+		App $kirby,
+		string $src,
+		string $dst,
+		array $options,
+	): string {
+		if (isset($options['logoSoupCrop']) === false) {
+			return ($kirby->nativeComponent('thumb'))($kirby, $src, $dst, $options);
+		}
+
+		$darkroom = new ExactCropImagick($kirby->option('thumbs', []));
+		$options = $darkroom->preprocess($src, $options);
+		$root = (new Filename($src, $dst, $options))->toString();
+		$extension = F::extension($root);
+		$tempRoot = F::dirname($root) . '/' . F::name($root) . '.tmp-' . uniqid();
+
+		if ($extension !== '') {
+			$tempRoot .= '.' . $extension;
+		}
+
+		F::copy($src, $tempRoot, true);
+
+		try {
+			$darkroom->process($tempRoot, $options);
+			F::move($tempRoot, $root, true);
+		} catch (Throwable $error) {
+			F::remove($tempRoot);
+			throw $error;
+		}
+
+		return $root;
+	}
+
 	public static function clearCache(File $file): void
 	{
 		[$pixelBudget, $threshold] = static::measurementOptions();
@@ -101,7 +187,7 @@ class LogoSoup
 		]);
 	}
 
-	/** @return array{0: list<int>, 1: int, 2: int} */
+	/** @return array{0: list<int>, 1: int, 2: int, 3: int, 4: int} */
 	private static function extractPixels(File $file, int $pixelBudget): array
 	{
 		$imagick = new Imagick();
@@ -112,6 +198,12 @@ class LogoSoup
 		}
 
 		$imagick->readImage($file->root());
+		$imagick->setIteratorIndex(0);
+
+		if (strtolower($file->extension()) !== 'svg') {
+			static::autoOrient($imagick);
+			$imagick->setImagePage(0, 0, 0, 0);
+		}
 
 		if ($imagick->getImageColorspace() !== Imagick::COLORSPACE_SRGB) {
 			$imagick->transformImageColorspace(Imagick::COLORSPACE_SRGB);
@@ -121,29 +213,37 @@ class LogoSoup
 			$imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_SET);
 		}
 
-		$width = $imagick->getImageWidth();
-		$height = $imagick->getImageHeight();
+		$sourceWidth = $imagick->getImageWidth();
+		$sourceHeight = $imagick->getImageHeight();
+		$sampleWidth = $sourceWidth;
+		$sampleHeight = $sourceHeight;
 
-		if ($width * $height > $pixelBudget) {
-			$scale = sqrt($pixelBudget / ($width * $height));
-			$width = max(1, (int) round($width * $scale));
-			$height = max(1, (int) round($height * $scale));
-			$imagick->resizeImage($width, $height, Imagick::FILTER_LANCZOS, 1);
+		if ($sampleWidth * $sampleHeight > $pixelBudget) {
+			$scale = sqrt($pixelBudget / ($sampleWidth * $sampleHeight));
+			$sampleWidth = max(1, (int) round($sampleWidth * $scale));
+			$sampleHeight = max(1, (int) round($sampleHeight * $scale));
+			$imagick->resizeImage($sampleWidth, $sampleHeight, Imagick::FILTER_LANCZOS, 1);
 		}
 
-		$pixels = $imagick->exportImagePixels(0, 0, $width, $height, 'RGBA', Imagick::PIXEL_CHAR);
+		$pixels = $imagick->exportImagePixels(0, 0, $sampleWidth, $sampleHeight, 'RGBA', Imagick::PIXEL_CHAR);
 		$imagick->clear();
 		$imagick->destroy();
 
-		return [$pixels, $width, $height];
+		return [$pixels, $sampleWidth, $sampleHeight, $sourceWidth, $sourceHeight];
 	}
 
-	private static function measurePixels(array $pixels, int $width, int $height, int $threshold): array
-	{
-		[$alphaOnly, $background] = static::analyzePerimeter($pixels, $width, $height);
+	private static function measurePixels(
+		array $pixels,
+		int $sampleWidth,
+		int $sampleHeight,
+		int $sourceWidth,
+		int $sourceHeight,
+		int $threshold,
+	): array {
+		[$alphaOnly, $background] = static::analyzePerimeter($pixels, $sampleWidth, $sampleHeight);
 		$thresholdSquared = $threshold * $threshold * 3;
-		$minX = $width;
-		$minY = $height;
+		$minX = $sampleWidth;
+		$minY = $sampleHeight;
 		$maxX = 0;
 		$maxY = 0;
 		$filledPixels = 0;
@@ -152,9 +252,9 @@ class LogoSoup
 		$weightedX = 0.0;
 		$weightedY = 0.0;
 
-		for ($y = 0; $y < $height; $y++) {
-			for ($x = 0; $x < $width; $x++) {
-				$i = ($y * $width + $x) * 4;
+		for ($y = 0; $y < $sampleHeight; $y++) {
+			for ($x = 0; $x < $sampleWidth; $x++) {
+				$i = ($y * $sampleWidth + $x) * 4;
 				$r = $pixels[$i] & 0xFF;
 				$g = $pixels[$i + 1] & 0xFF;
 				$b = $pixels[$i + 2] & 0xFF;
@@ -193,24 +293,67 @@ class LogoSoup
 			}
 		}
 
-		if ($filledPixels === 0) {
-			return [
-				'contentRatio' => $width / $height,
+		$scaleX = $sourceWidth / $sampleWidth;
+		$scaleY = $sourceHeight / $sampleHeight;
+		$base = [
+			'width' => $sourceWidth,
+			'height' => $sourceHeight,
+			'sampleWidth' => $sampleWidth,
+			'sampleHeight' => $sampleHeight,
+			'sampleScaleX' => $scaleX,
+			'sampleScaleY' => $scaleY,
+		];
+
+		if ($minX > $maxX || $minY > $maxY) {
+			return $base + [
+				'contentBox' => [
+					'x' => 0,
+					'y' => 0,
+					'width' => $sourceWidth,
+					'height' => $sourceHeight,
+				],
+				'contentRatio' => $sourceWidth / $sourceHeight,
 				'pixelDensity' => 0.5,
+				'visualCenter' => [
+					'x' => $sourceWidth / 2,
+					'y' => $sourceHeight / 2,
+					'offsetX' => 0.0,
+					'offsetY' => 0.0,
+				],
 				'visualCenterX' => 0.0,
 				'visualCenterY' => 0.0,
 			];
 		}
 
-		$contentWidth = $maxX - $minX + 1;
-		$contentHeight = $maxY - $minY + 1;
-		$centerX = $totalWeight > 0 ? $weightedX / $totalWeight : $minX + $contentWidth / 2;
-		$centerY = $totalWeight > 0 ? $weightedY / $totalWeight : $minY + $contentHeight / 2;
-		$metrics = [
+		$contentX = (int) floor($minX * $scaleX);
+		$contentY = (int) floor($minY * $scaleY);
+		$contentWidth = min((int) ceil(($maxX + 1) * $scaleX), $sourceWidth) - $contentX;
+		$contentHeight = min((int) ceil(($maxY + 1) * $scaleY), $sourceHeight) - $contentY;
+		$centerX = $totalWeight > 0
+			? ($weightedX / $totalWeight) * $scaleX
+			: $contentX + $contentWidth / 2;
+		$centerY = $totalWeight > 0
+			? ($weightedY / $totalWeight) * $scaleY
+			: $contentY + $contentHeight / 2;
+		$offsetX = $centerX - $contentX - $contentWidth / 2;
+		$offsetY = $centerY - $contentY - $contentHeight / 2;
+		$metrics = $base + [
+			'contentBox' => [
+				'x' => $contentX,
+				'y' => $contentY,
+				'width' => $contentWidth,
+				'height' => $contentHeight,
+			],
 			'contentRatio' => $contentWidth / $contentHeight,
-			'pixelDensity' => $totalOpacity / (255 * $contentWidth * $contentHeight),
-			'visualCenterX' => ($centerX - $minX - $contentWidth / 2) / $contentWidth,
-			'visualCenterY' => ($centerY - $minY - $contentHeight / 2) / $contentHeight,
+			'pixelDensity' => $totalOpacity / (255 * ($maxX - $minX + 1) * ($maxY - $minY + 1)),
+			'visualCenter' => [
+				'x' => $centerX,
+				'y' => $centerY,
+				'offsetX' => $offsetX,
+				'offsetY' => $offsetY,
+			],
+			'visualCenterX' => $offsetX / $contentWidth,
+			'visualCenterY' => $offsetY / $contentHeight,
 		];
 
 		if (!$alphaOnly) {
@@ -218,6 +361,38 @@ class LogoSoup
 		}
 
 		return $metrics;
+	}
+
+	private static function autoOrient(Imagick $image): void
+	{
+		switch ($image->getImageOrientation()) {
+			case Imagick::ORIENTATION_TOPRIGHT:
+				$image->flopImage();
+				break;
+			case Imagick::ORIENTATION_BOTTOMRIGHT:
+				$image->rotateImage(new ImagickPixel('transparent'), 180);
+				break;
+			case Imagick::ORIENTATION_BOTTOMLEFT:
+				$image->flopImage();
+				$image->rotateImage(new ImagickPixel('transparent'), 180);
+				break;
+			case Imagick::ORIENTATION_LEFTTOP:
+				$image->flopImage();
+				$image->rotateImage(new ImagickPixel('transparent'), -90);
+				break;
+			case Imagick::ORIENTATION_RIGHTTOP:
+				$image->rotateImage(new ImagickPixel('transparent'), 90);
+				break;
+			case Imagick::ORIENTATION_RIGHTBOTTOM:
+				$image->flopImage();
+				$image->rotateImage(new ImagickPixel('transparent'), 90);
+				break;
+			case Imagick::ORIENTATION_LEFTBOTTOM:
+				$image->rotateImage(new ImagickPixel('transparent'), -90);
+				break;
+		}
+
+		$image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
 	}
 
 	/** @return array{0: bool, 1: array{r: int, g: int, b: int}} */

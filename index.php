@@ -30,6 +30,14 @@ App::plugin('tobimori/logo-soup', [
 	'snippets' => [
 		'logo-soup' => __DIR__ . '/snippets/logo-soup.php',
 	],
+	'components' => [
+		'thumb' => fn(
+			App $kirby,
+			string $src,
+			string $dst,
+			array $options,
+		): string => LogoSoup::createThumb($kirby, $src, $dst, $options),
+	],
 	'hooks' => [
 		'file.replace:before' => fn(File $file) => LogoSoup::clearCache($file),
 	],

@@ -34,6 +34,7 @@ class ComposerStaticInit17f85c3919c6fe77fb99be42fc100816
         'Kirby\\ComposerInstaller\\Installer' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/Installer.php',
         'Kirby\\ComposerInstaller\\Plugin' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/Plugin.php',
         'Kirby\\ComposerInstaller\\PluginInstaller' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/PluginInstaller.php',
+        'tobimori\\ExactCropImagick' => __DIR__ . '/../..' . '/classes/ExactCropImagick.php',
         'tobimori\\LogoSoup' => __DIR__ . '/../..' . '/classes/LogoSoup.php',
     );
 

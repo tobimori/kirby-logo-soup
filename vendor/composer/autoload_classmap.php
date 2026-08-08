@@ -11,5 +11,6 @@ return array(
     'Kirby\\ComposerInstaller\\Installer' => $vendorDir . '/getkirby/composer-installer/src/ComposerInstaller/Installer.php',
     'Kirby\\ComposerInstaller\\Plugin' => $vendorDir . '/getkirby/composer-installer/src/ComposerInstaller/Plugin.php',
     'Kirby\\ComposerInstaller\\PluginInstaller' => $vendorDir . '/getkirby/composer-installer/src/ComposerInstaller/PluginInstaller.php',
+    'tobimori\\ExactCropImagick' => $baseDir . '/classes/ExactCropImagick.php',
     'tobimori\\LogoSoup' => $baseDir . '/classes/LogoSoup.php',
 );
