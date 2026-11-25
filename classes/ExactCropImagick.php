@@ -25,22 +25,21 @@ class ExactCropImagick extends Imagick
 			$image->getImageHeight() - $y
 		);
 
-		foreach ($image as $frame) {
-			$frame->cropImage($width, $height, $x, $y);
-			$frame->setImagePage(0, 0, 0, 0);
+		// Kirby calls resize() once per frame with the iterator on that frame, so a loop over
+		// the frames here would reset the iterator and never let Kirby's loop finish
+		$image->cropImage($width, $height, $x, $y);
+		$image->setImagePage(0, 0, 0, 0);
 
-			if ($width !== (int)$options['width'] || $height !== (int)$options['height']) {
-				$frame->resizeImage(
-					(int)$options['width'],
-					(int)$options['height'],
-					Image::FILTER_LANCZOS,
-					1,
-					true
-				);
-			}
+		if ($width !== (int)$options['width'] || $height !== (int)$options['height']) {
+			$image->resizeImage(
+				(int)$options['width'],
+				(int)$options['height'],
+				Image::FILTER_LANCZOS,
+				1,
+				true
+			);
 		}
 
-		$image->setFirstIterator();
 		return $image;
 	}
 }
