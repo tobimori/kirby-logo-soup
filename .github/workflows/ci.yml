@@ -53,6 +53,11 @@ jobs:
           coverage: none
           tools: composer
 
+      # ImageMagick on the runner has no librsvg, and its own SVG renderer adds an edge pixel to
+      # shapes, so the measured SVG bounds would be off by one. ImageMagick uses Inkscape if installed
+      - name: install inkscape
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends inkscape
+
       - name: install php dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
