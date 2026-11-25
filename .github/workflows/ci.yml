@@ -32,13 +32,14 @@ jobs:
         run: vendor/bin/mago lint
 
   static-analysis:
-    name: static analysis and tests (PHP ${{ matrix.php }})
+    name: static analysis and tests (PHP ${{ matrix.php }}, Kirby ${{ matrix.kirby }})
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
         php: ["8.3", "8.4", "8.5"]
+        kirby: ["5", "6"]
 
     steps:
       - name: checkout
@@ -54,6 +55,11 @@ jobs:
 
       - name: install php dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
+
+      # The lock file pins Kirby 5, the lowest supported version
+      - name: install kirby 6
+        if: matrix.kirby == '6'
+        run: composer require --dev "getkirby/cms:^6.0" --with-all-dependencies --no-interaction --no-progress
 
       - name: run mago analyze
         run: vendor/bin/mago --php-version=${{ matrix.php }} analyze
