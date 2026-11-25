@@ -16,9 +16,26 @@
 		"getkirby/composer-installer": "^1.2",
 		"ext-imagick": "*"
 	},
+	"require-dev": {
+		"carthage-software/mago": "^1.61.0",
+		"getkirby/cms": "^5.6.4"
+	},
+	"scripts": {
+		"analyze": "mago analyze",
+		"dist": "composer install --no-dev --optimize-autoloader",
+		"fix": [
+			"mago lint --fix",
+			"mago fmt"
+		],
+		"fmt": "mago fmt",
+		"fmt:check": "mago fmt --check",
+		"lint": "mago lint",
+		"test": "php tests/run.php"
+	},
 	"config": {
 		"optimize-autoloader": true,
 		"allow-plugins": {
+			"carthage-software/mago": true,
 			"getkirby/composer-installer": true
 		}
 	},
@@ -26,5 +43,8 @@
 		"psr-4": {
 			"tobimori\\": "classes/"
 		}
+	},
+	"extra": {
+		"kirby-cms-path": false
 	}
 }

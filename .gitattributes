@@ -1,5 +1,15 @@
 # Do not publish the following files via composer:
+.github/ export-ignore
 docs/ export-ignore
+scripts/ export-ignore
+stubs/ export-ignore
+tests/ export-ignore
 .gitattributes export-ignore
 .gitignore export-ignore
+AGENTS.md export-ignore
 composer.lock export-ignore
+mago.toml export-ignore
+mise.toml export-ignore
+package.json export-ignore
+pnpm-lock.yaml export-ignore
+t3.json export-ignore

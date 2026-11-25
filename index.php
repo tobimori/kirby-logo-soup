@@ -1,5 +1,6 @@
 <?php
 
+// @mago-expect lint:no-error-control-operator
 @include_once __DIR__ . '/vendor/autoload.php';
 
 use Kirby\Cms\App;
@@ -10,35 +11,32 @@ App::plugin('tobimori/logo-soup', [
 	'options' => [
 		'cache' => true,
 		'samplePixelBudget' => 2048,
-		'contrastThreshold' => 10,
+		'contrastThreshold' => 10
 	],
 	'fileMethods' => [
 		/** @kql-allowed */
-		'logoMetrics' => fn(): ?array => LogoSoup::analyze($this),
+		'logoMetrics' => function (): array|null {
+			/** @var File $this */
+			return LogoSoup::analyze($this);
+		},
 		/** @kql-allowed */
-		'logoNormalize' => fn(
-			float $baseSize = 48,
-			float $scaleFactor = 0.5,
-			float $densityFactor = 0.5,
-		): array =>  LogoSoup::normalize(
-			LogoSoup::analyze($this) ?? [],
-			$baseSize,
-			$scaleFactor,
-			$densityFactor,
-		),
+		'logoNormalize' => function (float $baseSize = 48, float $scaleFactor = 0.5, float $densityFactor = 0.5): array {
+			/** @var File $this */
+			return LogoSoup::normalize(LogoSoup::analyze($this) ?? [], $baseSize, $scaleFactor, $densityFactor);
+		}
 	],
 	'snippets' => [
-		'logo-soup' => __DIR__ . '/snippets/logo-soup.php',
+		'logo-soup' => __DIR__ . '/snippets/logo-soup.php'
 	],
 	'components' => [
-		'thumb' => fn(
+		'thumb' => fn (
 			App $kirby,
 			string $src,
 			string $dst,
-			array $options,
-		): string => LogoSoup::createThumb($kirby, $src, $dst, $options),
+			array $options
+		): string => LogoSoup::createThumb($kirby, $src, $dst, $options)
 	],
 	'hooks' => [
-		'file.replace:before' => fn(File $file) => LogoSoup::clearCache($file),
-	],
+		'file.replace:before' => fn (File $file) => LogoSoup::clearCache($file)
+	]
 ]);

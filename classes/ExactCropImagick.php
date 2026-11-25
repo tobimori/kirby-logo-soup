@@ -14,28 +14,28 @@ class ExactCropImagick extends Imagick
 		}
 
 		$crop = $options['logoSoupCrop'];
-		$x = max(0, (int) ($crop['x'] ?? 0));
-		$y = max(0, (int) ($crop['y'] ?? 0));
+		$x = max(0, (int)($crop['x'] ?? 0));
+		$y = max(0, (int)($crop['y'] ?? 0));
 		$width = min(
-			max(1, (int) ($crop['width'] ?? 0)),
-			$image->getImageWidth() - $x,
+			max(1, (int)($crop['width'] ?? 0)),
+			$image->getImageWidth() - $x
 		);
 		$height = min(
-			max(1, (int) ($crop['height'] ?? 0)),
-			$image->getImageHeight() - $y,
+			max(1, (int)($crop['height'] ?? 0)),
+			$image->getImageHeight() - $y
 		);
 
 		foreach ($image as $frame) {
 			$frame->cropImage($width, $height, $x, $y);
 			$frame->setImagePage(0, 0, 0, 0);
 
-			if ($width !== $options['width'] || $height !== $options['height']) {
+			if ($width !== (int)$options['width'] || $height !== (int)$options['height']) {
 				$frame->resizeImage(
-					$options['width'],
-					$options['height'],
+					(int)$options['width'],
+					(int)$options['height'],
 					Image::FILTER_LANCZOS,
 					1,
-					true,
+					true
 				);
 			}
 		}

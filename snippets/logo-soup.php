@@ -14,6 +14,8 @@
  * @var string|array|null $class Additional classes for the container
  */
 
+use tobimori\LogoSoup;
+
 $baseSize ??= 48;
 $scaleFactor ??= 0.5;
 $densityFactor ??= 0.5;
@@ -27,25 +29,26 @@ $halfGap = $gap / 2;
 
 <div <?= attr([
 	'class' => $class,
-	'style' => 'text-align: center; text-wrap: balance',
+	'style' => 'text-align: center; text-wrap: balance'
 ]) ?>>
-	<?php foreach ($logos as $logo) : ?>
-		<?php $metrics = $logo->logoMetrics() ?? [] ?>
-		<?php $norm = \tobimori\LogoSoup::normalize($metrics, $baseSize, $scaleFactor, $densityFactor) ?>
+	<?php foreach ($logos as $logo): ?>
+		<?php $metrics = $logo->logoMetrics() ?>
+		<?php $norm = LogoSoup::normalize($metrics ?? [], $baseSize, $scaleFactor, $densityFactor) ?>
 		<?php
+
 		$transform = null;
 		if ($alignBy !== 'bounds') {
-			$ox = ($alignBy === 'visual-center' || $alignBy === 'visual-center-x') ? $norm['offsetX'] : 0;
-			$oy = ($alignBy === 'visual-center' || $alignBy === 'visual-center-y') ? $norm['offsetY'] : 0;
+			$ox = $alignBy === 'visual-center' || $alignBy === 'visual-center-x' ? $norm['offsetX'] : 0;
+			$oy = $alignBy === 'visual-center' || $alignBy === 'visual-center-y' ? $norm['offsetY'] : 0;
 			if (abs($ox) > 0.5 || abs($oy) > 0.5) {
 				$transform = "transform: translate({$ox}px, {$oy}px);";
 			}
 		}
 		$style = "display: block; object-fit: contain; width: {$norm['width']}px; height: {$norm['height']}px;" . ($transform ? ' ' . $transform : '');
-		$isSvgCrop = $cropToContent && strtolower($logo->extension()) === 'svg' && isset($metrics['contentBox']);
+		$isSvgCrop = $cropToContent && strtolower($logo->extension()) === 'svg' && $metrics !== null;
 		?>
 		<span style="display: inline-block; vertical-align: middle; padding: <?= $halfGap ?>px">
-			<?php if ($isSvgCrop) : ?>
+			<?php if ($isSvgCrop): ?>
 				<svg viewBox="<?= implode(' ', array_map('intval', $metrics['contentBox'])) ?>" <?= attr([
 					'xmlns' => 'http://www.w3.org/2000/svg',
 					'width' => $norm['width'],
@@ -54,7 +57,7 @@ $halfGap = $gap / 2;
 					'role' => $logo->alt()->isNotEmpty() ? 'img' : null,
 					'aria-label' => $logo->alt()->isNotEmpty() ? $logo->alt()->value() : null,
 					'aria-hidden' => $logo->alt()->isEmpty() ? 'true' : null,
-					'focusable' => 'false',
+					'focusable' => 'false'
 				]) ?>>
 					<image preserveAspectRatio="none" <?= attr([
 						'href' => $logo->url(),
@@ -62,17 +65,17 @@ $halfGap = $gap / 2;
 						'y' => 0,
 						'width' => $metrics['width'],
 						'height' => $metrics['height'],
-						'aria-hidden' => 'true',
+						'aria-hidden' => 'true'
 					]) ?> />
 				</svg>
-			<?php else : ?>
-				<?php $source = $cropToContent ? \tobimori\LogoSoup::cropRaster($logo, $metrics) : $logo ?>
+			<?php else: ?>
+				<?php $source = $cropToContent ? LogoSoup::cropRaster($logo, $metrics ?? []) : $logo ?>
 				<img <?= attr([
 					'src' => $source->url(),
 					'alt' => $logo->alt()->value(),
 					'width' => $norm['width'],
 					'height' => $norm['height'],
-					'style' => $style,
+					'style' => $style
 				]) ?>>
 			<?php endif ?>
 		</span>

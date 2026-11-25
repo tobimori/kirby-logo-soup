@@ -10,20 +10,30 @@ use Kirby\Cms\FileVersion;
 use Kirby\Filesystem\Asset;
 use Kirby\Filesystem\F;
 use Kirby\Filesystem\Filename;
+use RuntimeException;
 use Throwable;
 
+/**
+ * @psalm-type ContentBox = array{x: int, y: int, width: int, height: int}
+ * @psalm-type Metrics = array{width: int, height: int, sampleWidth: int, sampleHeight: int, sampleScaleX: float|int, sampleScaleY: float|int, contentBox: ContentBox, contentRatio: float|int, pixelDensity: float, visualCenter: array{x: float|int, y: float|int, offsetX: float, offsetY: float}, visualCenterX: float, visualCenterY: float, backgroundLuminance?: float|int}
+ * @psalm-type PartialMetrics = array{width?: int, height?: int, contentBox?: ContentBox, contentRatio?: float|int, pixelDensity?: float, visualCenterX?: float, visualCenterY?: float, backgroundLuminance?: float|int, ...}
+ * @psalm-type Normalized = array{width: int, height: int, offsetX: float, offsetY: float}
+ */
 class LogoSoup
 {
 	private const CACHE_VERSION = 3;
 
-	public static function analyze(File $file): ?array
+	/** @return Metrics|null */
+	public static function analyze(File $file): array|null
 	{
 		$kirby = App::instance();
 		[$pixelBudget, $threshold] = static::measurementOptions();
 		$id = static::getCacheId($file, $pixelBudget, $threshold);
 		$cache = $kirby->cache('tobimori.logo-soup');
 
-		if ($cached = $cache->get($id)) {
+		/** @var Metrics|null $cached */
+		$cached = $cache->get($id);
+		if ($cached !== null) {
 			return $cached;
 		}
 
@@ -33,7 +43,7 @@ class LogoSoup
 				$sampleWidth,
 				$sampleHeight,
 				$sourceWidth,
-				$sourceHeight,
+				$sourceHeight
 			] = static::extractPixels($file, $pixelBudget);
 			$metrics = static::measurePixels(
 				$pixels,
@@ -41,7 +51,7 @@ class LogoSoup
 				$sampleHeight,
 				$sourceWidth,
 				$sourceHeight,
-				$threshold,
+				$threshold
 			);
 			$cache->set($id, $metrics);
 
@@ -51,27 +61,31 @@ class LogoSoup
 		}
 	}
 
+	/**
+	 * @param PartialMetrics $metrics
+	 * @return Normalized
+	 */
 	public static function normalize(
 		array $metrics,
 		float $baseSize = 48,
 		float $scaleFactor = 0.5,
-		float $densityFactor = 0.5,
+		float $densityFactor = 0.5
 	): array {
 		if (isset($metrics['contentRatio']) === false) {
 			return [
-				'width' => (int) $baseSize,
-				'height' => (int) $baseSize,
+				'width' => (int)$baseSize,
+				'height' => (int)$baseSize,
 				'offsetX' => 0.0,
-				'offsetY' => 0.0,
+				'offsetY' => 0.0
 			];
 		}
 
 		$ratio = $metrics['contentRatio'];
-		$width = $ratio ** $scaleFactor * $baseSize;
+		$width = ($ratio ** $scaleFactor) * $baseSize;
 		$height = $width / $ratio;
 
 		if (isset($metrics['backgroundLuminance'])) {
-			$irradiationScale = 1 - (1 - $metrics['backgroundLuminance']) * ($metrics['pixelDensity'] ?? 0.5) * 0.08;
+			$irradiationScale = 1 - ((1 - $metrics['backgroundLuminance']) * ($metrics['pixelDensity'] ?? 0.5) * 0.08);
 			$width *= $irradiationScale;
 			$height *= $irradiationScale;
 		}
@@ -84,13 +98,14 @@ class LogoSoup
 		}
 
 		return [
-			'width' => (int) round($width),
-			'height' => (int) round($height),
-			'offsetX' => round(- ($metrics['visualCenterX'] ?? 0) * $width, 1),
-			'offsetY' => round(- ($metrics['visualCenterY'] ?? 0) * $height, 1),
+			'width' => (int)round($width),
+			'height' => (int)round($height),
+			'offsetX' => round(-($metrics['visualCenterX'] ?? 0) * $width, 1),
+			'offsetY' => round(-($metrics['visualCenterY'] ?? 0) * $height, 1)
 		];
 	}
 
+	/** @param PartialMetrics $metrics */
 	public static function cropRaster(File $file, array $metrics): FileVersion|File|Asset
 	{
 		if (
@@ -101,12 +116,12 @@ class LogoSoup
 		}
 
 		$box = $metrics['contentBox'];
-		$x = max(0, (int) ($box['x'] ?? 0));
-		$y = max(0, (int) ($box['y'] ?? 0));
-		$width = max(1, (int) ($box['width'] ?? 0));
-		$height = max(1, (int) ($box['height'] ?? 0));
-		$sourceWidth = max(1, (int) ($metrics['width'] ?? $file->width()));
-		$sourceHeight = max(1, (int) ($metrics['height'] ?? $file->height()));
+		$x = max(0, $box['x']);
+		$y = max(0, $box['y']);
+		$width = max(1, $box['width']);
+		$height = max(1, $box['height']);
+		$sourceWidth = max(1, $metrics['width'] ?? $file->width());
+		$sourceHeight = max(1, $metrics['height'] ?? $file->height());
 		$width = min($width, $sourceWidth - $x);
 		$height = min($height, $sourceHeight - $y);
 
@@ -120,9 +135,9 @@ class LogoSoup
 			'crop' => implode('-', ['logo-soup', $x, $y, $width, $height]),
 			'format' => match (strtolower($file->extension())) {
 				'jpeg' => 'jpg',
-				default => strtolower($file->extension()),
+				default => strtolower($file->extension())
 			},
-			'logoSoupCrop' => compact('x', 'y', 'width', 'height'),
+			'logoSoupCrop' => compact('x', 'y', 'width', 'height')
 		]);
 	}
 
@@ -130,13 +145,17 @@ class LogoSoup
 		App $kirby,
 		string $src,
 		string $dst,
-		array $options,
+		array $options
 	): string {
 		if (isset($options['logoSoupCrop']) === false) {
-			return ($kirby->nativeComponent('thumb'))($kirby, $src, $dst, $options);
+			/** @var \Closure(App, string, string, array): string $thumb */
+			$thumb = $kirby->nativeComponent('thumb');
+			return $thumb($kirby, $src, $dst, $options);
 		}
 
-		$darkroom = new ExactCropImagick($kirby->option('thumbs', []));
+		/** @var array<string, mixed> $thumbs */
+		$thumbs = $kirby->option('thumbs', []);
+		$darkroom = new ExactCropImagick($thumbs);
 		$options = $darkroom->preprocess($src, $options);
 		$root = (new Filename($src, $dst, $options))->toString();
 		$extension = F::extension($root);
@@ -167,13 +186,14 @@ class LogoSoup
 			->remove(static::getCacheId($file, $pixelBudget, $threshold));
 	}
 
+	/** @return list{int, int} */
 	private static function measurementOptions(): array
 	{
 		$kirby = App::instance();
 
 		return [
-			max(1, (int) $kirby->option('tobimori.logo-soup.samplePixelBudget', 2048)),
-			max(0, (int) $kirby->option('tobimori.logo-soup.contrastThreshold', 10)),
+			max(1, (int)$kirby->option('tobimori.logo-soup.samplePixelBudget', 2048)),
+			max(0, (int)$kirby->option('tobimori.logo-soup.contrastThreshold', 10))
 		];
 	}
 
@@ -183,7 +203,9 @@ class LogoSoup
 			'v' . static::CACHE_VERSION,
 			$pixelBudget,
 			$threshold,
-			$file->uuid()?->id() ?? $file->id(),
+			// Kirby types File::uuid() as never null, but it is null with disabled UUIDs
+			// @mago-expect analysis:redundant-nullsafe-operator,redundant-null-coalesce
+			$file->uuid()?->id() ?? $file->id()
 		]);
 	}
 
@@ -197,7 +219,7 @@ class LogoSoup
 			$imagick->setResolution(96, 96);
 		}
 
-		$imagick->readImage($file->root());
+		$imagick->readImage($file->root() ?? throw new RuntimeException('File has no root'));
 		$imagick->setIteratorIndex(0);
 
 		if (strtolower($file->extension()) !== 'svg') {
@@ -218,13 +240,14 @@ class LogoSoup
 		$sampleWidth = $sourceWidth;
 		$sampleHeight = $sourceHeight;
 
-		if ($sampleWidth * $sampleHeight > $pixelBudget) {
+		if (($sampleWidth * $sampleHeight) > $pixelBudget) {
 			$scale = sqrt($pixelBudget / ($sampleWidth * $sampleHeight));
-			$sampleWidth = max(1, (int) round($sampleWidth * $scale));
-			$sampleHeight = max(1, (int) round($sampleHeight * $scale));
+			$sampleWidth = max(1, (int)round($sampleWidth * $scale));
+			$sampleHeight = max(1, (int)round($sampleHeight * $scale));
 			$imagick->resizeImage($sampleWidth, $sampleHeight, Imagick::FILTER_LANCZOS, 1);
 		}
 
+		/** @var list<int> $pixels */
 		$pixels = $imagick->exportImagePixels(0, 0, $sampleWidth, $sampleHeight, 'RGBA', Imagick::PIXEL_CHAR);
 		$imagick->clear();
 		$imagick->destroy();
@@ -232,13 +255,17 @@ class LogoSoup
 		return [$pixels, $sampleWidth, $sampleHeight, $sourceWidth, $sourceHeight];
 	}
 
+	/**
+	 * @param list<int> $pixels
+	 * @return Metrics
+	 */
 	private static function measurePixels(
 		array $pixels,
 		int $sampleWidth,
 		int $sampleHeight,
 		int $sourceWidth,
 		int $sourceHeight,
-		int $threshold,
+		int $threshold
 	): array {
 		[$alphaOnly, $background] = static::analyzePerimeter($pixels, $sampleWidth, $sampleHeight);
 		$thresholdSquared = $threshold * $threshold * 3;
@@ -254,7 +281,7 @@ class LogoSoup
 
 		for ($y = 0; $y < $sampleHeight; $y++) {
 			for ($x = 0; $x < $sampleWidth; $x++) {
-				$i = ($y * $sampleWidth + $x) * 4;
+				$i = (($y * $sampleWidth) + $x) * 4;
 				$r = $pixels[$i] & 0xFF;
 				$g = $pixels[$i + 1] & 0xFF;
 				$b = $pixels[$i + 2] & 0xFF;
@@ -271,7 +298,7 @@ class LogoSoup
 					$dr = $r - $background['r'];
 					$dg = $g - $background['g'];
 					$db = $b - $background['b'];
-					$distanceSquared = $dr * $dr + $dg * $dg + $db * $db;
+					$distanceSquared = ($dr * $dr) + ($dg * $dg) + ($db * $db);
 
 					if ($distanceSquared < $thresholdSquared) {
 						continue;
@@ -301,48 +328,50 @@ class LogoSoup
 			'sampleWidth' => $sampleWidth,
 			'sampleHeight' => $sampleHeight,
 			'sampleScaleX' => $scaleX,
-			'sampleScaleY' => $scaleY,
+			'sampleScaleY' => $scaleY
 		];
 
 		if ($minX > $maxX || $minY > $maxY) {
-			return $base + [
-				'contentBox' => [
-					'x' => 0,
-					'y' => 0,
-					'width' => $sourceWidth,
-					'height' => $sourceHeight,
-				],
-				'contentRatio' => $sourceWidth / $sourceHeight,
-				'pixelDensity' => 0.5,
-				'visualCenter' => [
-					'x' => $sourceWidth / 2,
-					'y' => $sourceHeight / 2,
-					'offsetX' => 0.0,
-					'offsetY' => 0.0,
-				],
-				'visualCenterX' => 0.0,
-				'visualCenterY' => 0.0,
-			];
+			return $base +
+				[
+					'contentBox' => [
+						'x' => 0,
+						'y' => 0,
+						'width' => $sourceWidth,
+						'height' => $sourceHeight
+					],
+					'contentRatio' => $sourceWidth / $sourceHeight,
+					'pixelDensity' => 0.5,
+					'visualCenter' => [
+						'x' => $sourceWidth / 2,
+						'y' => $sourceHeight / 2,
+						'offsetX' => 0.0,
+						'offsetY' => 0.0
+					],
+					'visualCenterX' => 0.0,
+					'visualCenterY' => 0.0
+				];
 		}
 
-		$contentX = (int) floor($minX * $scaleX);
-		$contentY = (int) floor($minY * $scaleY);
-		$contentWidth = min((int) ceil(($maxX + 1) * $scaleX), $sourceWidth) - $contentX;
-		$contentHeight = min((int) ceil(($maxY + 1) * $scaleY), $sourceHeight) - $contentY;
+		$contentX = (int)floor($minX * $scaleX);
+		$contentY = (int)floor($minY * $scaleY);
+		$contentWidth = min((int)ceil(($maxX + 1) * $scaleX), $sourceWidth) - $contentX;
+		$contentHeight = min((int)ceil(($maxY + 1) * $scaleY), $sourceHeight) - $contentY;
 		$centerX = $totalWeight > 0
 			? ($weightedX / $totalWeight) * $scaleX
-			: $contentX + $contentWidth / 2;
+			: $contentX + ($contentWidth / 2);
 		$centerY = $totalWeight > 0
 			? ($weightedY / $totalWeight) * $scaleY
-			: $contentY + $contentHeight / 2;
-		$offsetX = $centerX - $contentX - $contentWidth / 2;
-		$offsetY = $centerY - $contentY - $contentHeight / 2;
-		$metrics = $base + [
+			: $contentY + ($contentHeight / 2);
+		$offsetX = $centerX - $contentX - ($contentWidth / 2);
+		$offsetY = $centerY - $contentY - ($contentHeight / 2);
+		$metrics = $base +
+		[
 			'contentBox' => [
 				'x' => $contentX,
 				'y' => $contentY,
 				'width' => $contentWidth,
-				'height' => $contentHeight,
+				'height' => $contentHeight
 			],
 			'contentRatio' => $contentWidth / $contentHeight,
 			'pixelDensity' => $totalOpacity / (255 * ($maxX - $minX + 1) * ($maxY - $minY + 1)),
@@ -350,14 +379,14 @@ class LogoSoup
 				'x' => $centerX,
 				'y' => $centerY,
 				'offsetX' => $offsetX,
-				'offsetY' => $offsetY,
+				'offsetY' => $offsetY
 			],
 			'visualCenterX' => $offsetX / $contentWidth,
-			'visualCenterY' => $offsetY / $contentHeight,
+			'visualCenterY' => $offsetY / $contentHeight
 		];
 
 		if (!$alphaOnly) {
-			$metrics['backgroundLuminance'] = ($background['r'] * 299 + $background['g'] * 587 + $background['b'] * 114) / 255000;
+			$metrics['backgroundLuminance'] = (($background['r'] * 299) + ($background['g'] * 587) + ($background['b'] * 114)) / 255000;
 		}
 
 		return $metrics;
@@ -395,7 +424,10 @@ class LogoSoup
 		$image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
 	}
 
-	/** @return array{0: bool, 1: array{r: int, g: int, b: int}} */
+	/**
+	 * @param list<int> $pixels
+	 * @return array{0: bool, 1: array{r: int, g: int, b: int}}
+	 */
 	private static function analyzePerimeter(array $pixels, int $width, int $height): array
 	{
 		$buckets = [];
@@ -415,7 +447,7 @@ class LogoSoup
 			$r = $pixels[$i] & 0xFF;
 			$g = $pixels[$i + 1] & 0xFF;
 			$b = $pixels[$i + 2] & 0xFF;
-			$key = (($r >> 5) * 8 + ($g >> 5)) * 8 + ($b >> 5);
+			$key = (((($r >> 5) * 8) + ($g >> 5)) * 8) + ($b >> 5);
 			$buckets[$key] ??= [0, 0, 0, 0];
 			$buckets[$key][0]++;
 			$buckets[$key][1] += $r;
@@ -426,14 +458,14 @@ class LogoSoup
 		for ($x = 0; $x < $width; $x++) {
 			$sample($x);
 			if ($height > 1) {
-				$sample(($height - 1) * $width + $x);
+				$sample((($height - 1) * $width) + $x);
 			}
 		}
 
-		for ($y = 1; $y < $height - 1; $y++) {
+		for ($y = 1; $y < ($height - 1); $y++) {
 			$sample($y * $width);
 			if ($width > 1) {
-				$sample($y * $width + $width - 1);
+				$sample(($y * $width) + $width - 1);
 			}
 		}
 
@@ -446,15 +478,15 @@ class LogoSoup
 
 		$background = $dominant[0] > 0
 			? [
-				'r' => (int) round($dominant[1] / $dominant[0]),
-				'g' => (int) round($dominant[2] / $dominant[0]),
-				'b' => (int) round($dominant[3] / $dominant[0]),
+				'r' => (int)round($dominant[1] / $dominant[0]),
+				'g' => (int)round($dominant[2] / $dominant[0]),
+				'b' => (int)round($dominant[3] / $dominant[0])
 			]
 			: ['r' => 255, 'g' => 255, 'b' => 255];
 
 		return [
-			$opaque + $transparent > 0 && $transparent > ($opaque + $transparent) * 0.1,
-			$background,
+			($opaque + $transparent) > 0 && $transparent > (($opaque + $transparent) * 0.1),
+			$background
 		];
 	}
 }

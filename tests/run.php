@@ -4,20 +4,13 @@ use Kirby\Cms\App;
 use Kirby\Cms\File;
 use tobimori\LogoSoup;
 
-$kirbyAutoload = getenv('KIRBY_AUTOLOAD') ?: dirname(__DIR__, 2) . '/vendor/autoload.php';
-
-if (file_exists($kirbyAutoload) === false) {
-	fwrite(STDERR, "Set KIRBY_AUTOLOAD to a Composer autoloader that contains Kirby 5.\n");
-	exit(1);
-}
-
-require $kirbyAutoload;
-require __DIR__ . '/../vendor/autoload.php';
-require __DIR__ . '/../index.php';
+$plugin = dirname(__DIR__);
+require is_file("{$plugin}/.repos/vendor/autoload.php") ? "{$plugin}/.repos/vendor/autoload.php" : "{$plugin}/vendor/autoload.php";
+require "{$plugin}/index.php";
 
 $root = sys_get_temp_dir() . '/kirby-logo-soup-tests-' . getmypid();
 foreach (['content', 'media', 'plugins', 'site', 'cache'] as $directory) {
-	mkdir($root . '/' . $directory, 0777, true);
+	mkdir($root . '/' . $directory, 0o777, true);
 }
 
 register_shutdown_function(static function () use ($root): void {
@@ -33,16 +26,16 @@ $kirby = new App([
 		'media' => $root . '/media',
 		'plugins' => $root . '/plugins',
 		'site' => $root . '/site',
-		'cache' => $root . '/cache',
+		'cache' => $root . '/cache'
 	],
 	'urls' => [
 		'index' => 'https://example.test',
-		'media' => 'https://example.test/media',
+		'media' => 'https://example.test/media'
 	],
 	'options' => [
 		'tobimori.logo-soup.samplePixelBudget' => 50_000,
-		'tobimori.logo-soup.contrastThreshold' => 10,
-	],
+		'tobimori.logo-soup.contrastThreshold' => 10
+	]
 ]);
 
 copy(__DIR__ . '/fixtures/tight.svg', $root . '/content/tight.svg');
@@ -82,11 +75,11 @@ $tests['sample coordinates map back to source pixels'] = static function () use 
 	assertTrue($metrics['sampleWidth'] < $metrics['width']);
 	assertSame(
 		$metrics['width'] / $metrics['sampleWidth'],
-		$metrics['sampleScaleX'],
+		$metrics['sampleScaleX']
 	);
 	assertSame(
 		$metrics['height'] / $metrics['sampleHeight'],
-		$metrics['sampleScaleY'],
+		$metrics['sampleScaleY']
 	);
 	assertSame([196, 96, 408, 308], array_values($metrics['contentBox']));
 };
@@ -139,7 +132,7 @@ $tests['file replacement invalidates measurement cache'] = static function () us
 	createTransparentPng($root . '/replacement.png', 100, 80, [50, 30, 30, 25]);
 	$kirby->trigger('file.replace:before', [
 		'file' => $replace,
-		'upload' => $replace->asset($root . '/replacement.png'),
+		'upload' => $replace->asset($root . '/replacement.png')
 	]);
 	copy($root . '/replacement.png', $replace->root());
 	$after = requiredMetrics($replace)['contentBox'];
@@ -172,7 +165,7 @@ function fixtureFile(App $kirby, string $root, string $filename): File
 		'filename' => $filename,
 		'parent' => $kirby->site(),
 		'root' => $root . '/content/' . $filename,
-		'content' => ['alt' => 'Fixture logo'],
+		'content' => ['alt' => 'Fixture logo']
 	]);
 }
 
@@ -183,10 +176,10 @@ function requiredMetrics(File $file): array
 
 function renderSoup(App $kirby, File $file, bool $cropToContent, string $alignBy = 'visual-center-y'): string
 {
-	return (string) $kirby->snippet('logo-soup', [
+	return (string)$kirby->snippet('logo-soup', [
 		'logos' => [$file],
 		'cropToContent' => $cropToContent,
-		'alignBy' => $alignBy,
+		'alignBy' => $alignBy
 	]);
 }
 
