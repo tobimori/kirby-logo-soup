@@ -159,7 +159,8 @@ class LogoSoup
 		$options = $darkroom->preprocess($src, $options);
 		$root = (new Filename($src, $dst, $options))->toString();
 		$extension = F::extension($root);
-		$tempRoot = F::dirname($root) . '/' . F::name($root) . '.tmp-' . uniqid();
+		// Hidden like in Kirby's thumb component, so the temp file is never read as a page file
+		$tempRoot = F::dirname($root) . '/.' . F::name($root) . '.tmp-' . uniqid();
 
 		if ($extension !== '') {
 			$tempRoot .= '.' . $extension;
