@@ -1,13 +1,13 @@
 <?php return array(
     'root' => array(
         'name' => 'tobimori/kirby-logo-soup',
-        'pretty_version' => '1.1.1',
-        'version' => '1.1.1.0',
+        'pretty_version' => '1.2.0',
+        'version' => '1.2.0.0',
         'reference' => null,
         'type' => 'kirby-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
-        'dev' => true,
+        'dev' => false,
     ),
     'versions' => array(
         'getkirby/composer-installer' => array(
@@ -20,8 +20,8 @@
             'dev_requirement' => false,
         ),
         'tobimori/kirby-logo-soup' => array(
-            'pretty_version' => '1.1.1',
-            'version' => '1.1.1.0',
+            'pretty_version' => '1.2.0',
+            'version' => '1.2.0.0',
             'reference' => null,
             'type' => 'kirby-plugin',
             'install_path' => __DIR__ . '/../../',
